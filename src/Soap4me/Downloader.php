@@ -20,8 +20,11 @@ class Downloader
     private array $queue = [];
 
     /** @var AbstractNotify|null */
-    private ?AbstractNotify $notify;
+    private ?AbstractNotify $notify = null;
     private ?Quality $max_quality = null;
+
+    /** @var bool **/
+    private bool $markAsDownloadedSubtitleOnlyEpisodes = true;
 
     public function __construct(LoggerInterface $logger, AbstractTransport $transport)
     {
@@ -51,6 +54,13 @@ class Downloader
                 sprintf('Incorrect value of MAX_QUALITY variable "%s" it will be ignore', $max_quality)
             );
         }
+
+        return $this;
+    }
+
+    public function setMarkAsDownloadedSubtitleOnlyEpisodes(bool $flag): Downloader 
+    {
+        $this->markAsDownloadedSubtitleOnlyEpisodes = $flag;
 
         return $this;
     }
@@ -95,7 +105,12 @@ class Downloader
             $this->transport->download($v);
 
             try {
-                $v->markAsWatched();
+                // probably skip subtitle only episodes
+                $subOnly = $v->getTranslate() == 'Субтитры';
+
+                if (! $subOnly || $subOnly & $this->markAsDownloadedSubtitleOnlyEpisodes) {
+                    $v->markAsWatched();
+                }
             } catch (CurlException $e) {
                 $this->logger->error($e->getMessage());
             }

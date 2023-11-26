@@ -26,6 +26,7 @@ try {
     // @todo log level to params
     $log->pushHandler(new StreamHandler($_ENV['LOG_FILE'], Logger::DEBUG));
 } catch (Exception $e) {
+    print_r($e->getMessage());
 }
 
 try {
@@ -43,18 +44,23 @@ try {
         new Filesystem(new Local(realpath(dirname($_ENV['DOWNLOAD_DIR']))))
     );
 
-    $notify = new MailgunNotify($log, [
-        'from' => $_ENV['MAILGUN_FROM'],
-        'to' => $_ENV['NOTIFY_EMAIL'],
-        'domain' => $_ENV['MAILGUN_DOMAIN'],
-        'key' => $_ENV['MAILGUN_KEY'],
-    ]);
-
-    (new Downloader($log, $transport))
+    $downloader = (new Downloader($log, $transport))
         ->addBatch($parser->findUnwatched())
-        ->setNotify($notify)
         ->setMaxQuality($_ENV['MAX_QUALITY'])
-        ->download();
+        ->setMarkAsDownloadedSubtitleOnlyEpisodes($_ENV['MARK_AS_DOWNLOADED_SUBTITLE_ONLY_EPISODES']);
+
+    if (!empty($_ENV['NOTIFY_EMAIL'])) {
+        $downloader->setNotify(
+            new MailgunNotify($log, [
+                'from' => $_ENV['MAILGUN_FROM'],
+                'to' => $_ENV['NOTIFY_EMAIL'],
+                'domain' => $_ENV['MAILGUN_DOMAIN'],
+                'key' => $_ENV['MAILGUN_KEY'],
+            ])
+        );
+    }
+
+    $downloader->download();
 
     $log->info('Finish');
 } catch (Exception $e) {
